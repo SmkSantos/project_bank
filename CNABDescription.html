@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Leitor CNAB 400</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f2f2f2; }
+    input[type="file"] { margin-bottom: 20px; }
+    .container { display: flex; flex-wrap: wrap; gap: 20px; }
+    .card {
+      background: white; border-radius: 10px; padding: 15px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 250px;
+    }
+    .card h3 { margin-top: 0; color: #333; }
+    .card p { margin: 5px 0; }
+    .error { color: red; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+  <h1>Leitor de Arquivo CNAB 400 (.rem/.txt)</h1>
+  <input type="file" id="file-input" accept=".txt,.rem">
+  <div class="error" id="error-message"></div>
+  <div class="container" id="cards-container"></div>
+
+  <script>
+    const fileInput = document.getElementById('file-input');
+    const container = document.getElementById('cards-container');
+    const errorMessage = document.getElementById('error-message');
+
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const content = e.target.result;
+        try {
+          const dados = parseCNAB400(content);
+          container.innerHTML = '';
+          errorMessage.textContent = '';
+
+          dados.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'card';
+
+            const titulo = document.createElement('h3');
+            titulo.textContent = item.titulo || 'Registro';
+            card.appendChild(titulo);
+
+            for (const chave in item) {
+              if (chave !== 'titulo') {
+                const p = document.createElement('p');
+                p.textContent = `${chave}: ${item[chave]}`;
+                card.appendChild(p);
+              }
+            }
+
+            container.appendChild(card);
+          });
+        } catch (err) {
+          errorMessage.textContent = 'Erro ao processar o arquivo.';
+        }
+      };
+
+      reader.readAsText(file);
+    });
+
+    // Função para interpretar CNAB 400
+    function parseCNAB400(texto) {
+      const linhas = texto.trim().split('\n');
+      const registros = [];
+
+      linhas.forEach((linha, index) => {
+        if (linha.length < 400) return; // ignora linhas curtas
+
+        const tipoRegistro = linha.substring(0, 1);
+        if (tipoRegistro !== '1') return; // ignora header/trailer
+
+        const cliente = {
+          titulo: `Título - ${linha.substring(110, 120).trim()}`,
+          valor: (parseInt(linha.substring(130, 139)) / 100).toFixed(2),
+          CtrlPart: linha.substring(37, 62).trim(),
+          Vcto: linha.substring(120, 126).trim(),
+          JurosValor: (parseInt(linha.substring(163, 173)) / 100).toFixed(2),
+          multa: (parseInt(linha.substring(66, 70)) / 100).toFixed(2),
+          Agencia: linha.substring(25, 29),
+          Conta: linha.substring(32, 37),
+          NumBancario: linha.substring(70, 81),
+          nomePagador: linha.substring(234, 274),
+          carteira: linha.substring(22, 24),
+          instrucao: linha.substring(108,110),
+          abatimento: (parseInt(linha.substring(209,218)) / 100).toFixed(2),
+          desconto: (parseInt(linha.substring(156,165)) / 100).toFixed(2)
+
+        };
+
+        registros.push(cliente);
+      });
+
+      return registros;
+    }
+  </script>
+
+</body>
+</html>
